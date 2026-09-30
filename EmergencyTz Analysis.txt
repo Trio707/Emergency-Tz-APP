@@ -1,0 +1,181 @@
+Emergency Tanzania - Full Analysis
+===================================
+
+
+1. Identity & Location
+----------------------
+
+| | |
+|---|---|
+| App name | Emergency Tanzania (`rootProject.name = "Emergency Tanzania"`) |
+| Package / namespace | `tz.emergency.app` |
+| applicationId | `tz.emergency.app` |
+| Root dir | `C:\Users\Administrator\Downloads\EmergencyTanzania (1)\EmergencyTanzania (1)` |
+| Archive | `C:\Users\Administrator\Downloads\EmergencyTanzania (1).zip` (7,994 bytes, 2026-09-14 11:15) |
+| Version | `versionCode 1` / `versionName "1.0"` |
+| VCS | **None.** No `.git` -- despite a `.gitignore` existing. Project is a raw zip extract. |
+| Size | 406 lines of Kotlin across 8 files |
+
+Note the double-nesting: `Downloads\EmergencyTanzania (1)\` (extract dir) contains
+`.idea\` and a second `EmergencyTanzania (1)\` which is the true Gradle root.
+
+
+2. Language
+-----------
+
+- **Kotlin** exclusively -- 8 `.kt` files, zero `.java`
+- **XML** only for the Android shell: `AndroidManifest.xml`, `res/values/themes.xml`
+- **Gradle Kotlin DSL** (`.kts`) for all build scripts
+- **TOML** version catalog (`gradle/libs.versions.toml`)
+- JVM target **17**; source/target compatibility `JavaVersion.VERSION_17`
+
+
+3. Architecture
+---------------
+
+Single-module (`:app`), single-screen, no clean-architecture layering at all.
+Flat package layout:
+
+```
+tz.emergency.app
+|-- EmergencyService.kt          domain model (enum, constants)
+|-- MainActivity.kt              entry point + ALL business logic
++-- ui
+    |-- EmergencyTanzaniaApp.kt  the only screen
+    |-- services/                button components + icons
+    +-- theme/Theme.kt
+```
+
+Characteristics:
+- **UI-driven, no ViewModel.** No `androidx.lifecycle`, no `ViewModel`, no
+  StateFlow, no coroutines. The screen is a pure stateless `@Composable`.
+- **Logic lives in the Activity.** `MainActivity.kt:58-88` owns permission
+  checks, number resolution, and the debug/release branching -- it never
+  delegates to a repository or use-case layer.
+- **No data layer at all.** No Room, no DataStore, no network, no
+  serialization. The only persisted state is one boolean in `SharedPreferences`
+  (`"emergency_tanzania"` -> `call_permission_requested`), used solely to avoid
+  re-prompting.
+- **Hardcoded data.** Numbers live directly in the enum
+  (`EmergencyService.kt:15-17`) with no remote config or resource indirection.
+- **Icons hand-built** as `ImageVector` path literals in
+  `EmergencyServiceButton.kt:82-110` -- no Compose Material icon dependency, no
+  SVG/vector drawable assets. `res/` contains no drawables or strings at all.
+
+
+4. Frameworks & Technology
+--------------------------
+
+| Layer | Technology |
+|---|---|
+| UI | **Jetpack Compose + Material 3** (`compose-bom`, `ui`, `ui-graphics`, `material3`) |
+| Platform entry | `androidx.activity:activity-compose` (`ComponentActivity`, `setContent`, `enableEdgeToEdge`) |
+| Permissions | `ActivityResultContracts.RequestPermission` via `registerForActivityResult` |
+| Context helpers | `androidx.core:core-ktx` (`ContextCompat.checkSelfPermission`) |
+| Build | **AGP 8.7.3**, **Kotlin 2.0.21**, **Gradle 9.3.0** wrapper |
+| Compose compiler | New `org.jetbrains.kotlin.plugin.compose` plugin (Kotlin 2.0 style) |
+| SDK | `compileSdk 35`, `targetSdk 35`, **`minSdk 24`** (Android 7.0) |
+| Dep management | Gradle version catalog, `FAIL_ON_PROJECT_REPOS` |
+
+**Version alignment note:** AGP 8.7.3 paired with a Gradle 9.3.0 wrapper is a
+notable mismatch -- AGP 8.7.x officially supports Gradle 8.9+. Gradle 9 removed
+APIs older AGP relies on, so a clean build on a fresh machine is likely to fail
+or warn. It built here only because Android Studio's Gradle caches are warm.
+
+
+5. Dependencies (complete -- 8 total)
+-------------------------------------
+
+```kotlin
+implementation(libs.androidx.core.ktx)                    // 1.15.0
+implementation(libs.androidx.activity.compose)            // 1.10.0
+implementation(platform(libs.androidx.compose.bom))       // 2024.12.01
+implementation(libs.androidx.compose.ui)                  // via BOM
+implementation(libs.androidx.compose.ui.graphics)         // via BOM
+implementation(libs.androidx.compose.ui.tooling.preview)  // via BOM
+implementation(libs.androidx.compose.material3)           // via BOM
+debugImplementation(libs.androidx.compose.ui.tooling)     // via BOM
+```
+
+Zero third-party libraries. No Retrofit, no Dagger/Hilt/Koin, no
+kotlinx-serialization, no coroutines, no testing libs (`junit`, `espresso`,
+`compose-ui-test` are **entirely absent**).
+
+
+6. Permissions
+--------------
+
+Manifest declares exactly one permission:
+
+```xml
+<uses-permission android:name="android.permission.CALL_PHONE" />
+```
+
+This is the **dangerous** `CALL_PHONE`, not `ACTION_DIAL` -- meaning the app
+places calls with **no user confirmation dialog**. For an emergency app this is
+arguably the right call, but it's a deliberate trade-off worth being aware of.
+
+`allowBackup="false"`, `supportsRtl="true"`, single exported launcher activity.
+
+
+7. The Debug/Release Safety Mechanism
+-------------------------------------
+
+This is the most interesting engineering decision in the codebase, at
+`app/build.gradle.kts:4-12, 43-51`:
+
+1. `local.properties` is read at configure time and `DEBUG_TEST_PHONE_NUMBER` is
+   injected as a `buildConfigField`.
+2. The `release` build type is **not** configured, so it inherits the
+   `defaultConfig` field, hardcoded to `""` (`app/build.gradle.kts:30`).
+3. `MainActivity.kt:76-88` -- `numberToCall()`: if `!BuildConfig.DEBUG` -> real
+   number. If debug and the test number is empty -> **refuse to dial**, show a
+   toast, return `null`.
+4. `MainActivity.kt:39-41` -- the same guard gates the "TEST MODE" banner in the
+   UI.
+
+Net effect: **a debug APK physically cannot dial 112/114/115**, even if
+`local.properties` is missing or empty. That's a solid safety design for a repo
+that will be handed around as a zip. The escaping logic
+(`replace("\\","\\\\")`) prevents a stray quote or backslash in the number from
+breaking the generated Java.
+
+
+8. Development Stage Assessment
+-------------------------------
+
+**Stage 2 of 3 -- feature-complete prototype, pre-production hardening.**
+
+Concretely:
+
+| Area | State |
+|---|---|
+| Core feature (3 buttons + dial) | **Done and working** |
+| README says "one-tap calling implemented in Stage 2" | Confirmed true -- `MainActivity.kt:68` fires `ACTION_CALL` with `tel:` URI |
+| Compiles | Yes -- `app-debug.apk`, 9.0 MB, built 2026-09-14 14:12 |
+| Release build | **Never built.** No `signingConfig`, no `minifyEnabled`/proguard, no `release` block at all |
+| Tests | **Zero.** `app/src` contains only `main/` -- no `test/`, no `androidTest/` |
+| CI/CD | None. No `.github/`, no pipeline config |
+| Version control | **None** -- not a git repo, so no history, no branches, no collaboration |
+| Error handling | Partial. Catches `SecurityException` and `ActivityNotFoundException`; no `no network` / `SIM absent` / `airplane mode` handling |
+| Content verification | Numbers verified 2026-09-14 against tanzania.go.tz and polisi.go.tz, documented with sources in README and in code comments |
+| Localization | **None.** All strings hardcoded in Compose. `res/values/` has no `strings.xml`; label is hardcoded in the manifest |
+| Accessibility | Partial -- `contentDescription` set on buttons, `Role.Button` declared, but no `res/values-night/` variant and no `themes.xml` dark counterpart |
+| Packaging | Untouched default -- no app icon (no `mipmap-*` dirs at all), no `versionCode` bump |
+
+**Biggest gaps if this is to ship:** the missing app icon is immediately visible
+on a launcher; the hardcoded AGP/Gradle version mismatch will break a fresh
+clone; there is no test suite; and mainland-Tanzania-only is an explicit scope
+limit the README calls out.
+
+
+9. One Security Note
+--------------------
+
+`local.properties` contains a real phone number in plaintext (redacted here as
+`+255XXX XXX63`). It is correctly `.gitignore`d (line 3), so it will not be
+committed. The number stays on the local machine only.
+
+This document has been committed to a **private** repository, and the number is
+masked in this file, so sharing the repo does not expose it. If a `local.properties`
+ever needs to travel with the project, redact the value first.
