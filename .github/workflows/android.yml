@@ -34,12 +34,16 @@ jobs:
           echo "DEBUG_TEST_PHONE_NUMBER=${{ secrets.DEBUG_TEST_PHONE_NUMBER }}" >> local.properties
 
       - name: Build Debug APK
-        run: ./gradlew composeApp:assembleDebug
+        run: |
+          chmod +x ./gradlew
+          ./gradlew composeApp:assembleDebug
         env:
           DEBUG_TEST_PHONE_NUMBER: ${{ secrets.DEBUG_TEST_PHONE_NUMBER }}
 
       - name: Build Release AAB
-        run: ./gradlew composeApp:bundleRelease
+        run: |
+          chmod +x ./gradlew
+          ./gradlew composeApp:bundleRelease
         env:
           KEYSTORE_PATH: ${{ secrets.KEYSTORE_PATH }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -83,7 +87,9 @@ jobs:
           gradle-version: wrapper
 
       - name: Run Unit Tests
-        run: ./gradlew composeApp:testDebugUnitTest
+        run: |
+          chmod +x ./gradlew
+          ./gradlew composeApp:testDebugUnitTest
 
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
