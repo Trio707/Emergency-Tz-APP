@@ -27,7 +27,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: '9.3'
+          gradle-version: wrapper
 
       - name: Configure local.properties
         run: |
@@ -80,7 +80,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: '9.3'
+          gradle-version: wrapper
 
       - name: Run Unit Tests
         run: ./gradlew composeApp:testDebugUnitTest
