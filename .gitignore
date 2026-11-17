@@ -1,7 +1,39 @@
+# Gradle
 .gradle/
-.idea/
-local.properties
 build/
 **/build/
 *.iml
 
+# Local configuration
+local.properties
+
+# IDE
+.idea/
+*.iws
+*.ipr
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Android
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# iOS
+*.ipa
+*.xcarchive
+build/
+DerivedData/
+
+# Compose Multiplatform
+composeApp/build/
+composeApp/.gradle/
+
+# Signing (never commit!)
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
